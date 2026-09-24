@@ -1,35 +1,90 @@
-# Minha API
+# Trak Club
 
-Este pequeno projeto faz parte do material diático da Disciplina **Desenvolvimento Full Stack Básico** 
+O Trak Club é uma plataforma web para descobrir opções locais de esportes ao ar livre. Organizadores podem cadastrar e gerenciar as informações dos seus clubes e sessões disponíveis; clientes podem navegar por clubes e atividades semanais em uma interface responsiva.
 
-O objetivo aqui é ilutsrar o conteúdo apresentado ao longo das três aulas da disciplina.
+## Funcionalidades
 
----
-## Como executar 
+- Cadastro, edição e exclusão de clubes e suas sessões para o perfil de administrador.
+- Visualização de clubes, filtros por estado e atividade, e detalhes de cada clube.
+- Agenda semanal de sessões em formato de calendário ou lista.
+- Previsão do tempo para os próximos dias, baseada na localização atual do usuário ou em uma cidade pesquisada.
+- Perfis de cliente e administrador, com ações disponíveis conforme o perfil.
 
+## Arquitetura
 
-Será necessário ter todas as libs python listadas no `requirements.txt` instaladas.
-Após clonar o repositório, é necessário ir ao diretório raiz, pelo terminal, para poder executar os comandos descritos abaixo.
+![Fluxograma da arquitetura da aplicação](docs/architecture.svg)
 
-> É fortemente indicado o uso de ambientes virtuais do tipo [virtualenv](https://virtualenv.pypa.io/en/latest/installation.html).
+O frontend Angular é executado no navegador e consome a API Flask. A API persiste clubes e sessões em SQLite e expõe sua documentação no Swagger. Para a previsão, o frontend consulta a API pública Open-Meteo.
 
+## Tecnologias
+
+- Angular 21, TypeScript, Tailwind CSS e Axios
+- Python, Flask, Flask-OpenAPI3 e SQLAlchemy
+- SQLite
+- Open-Meteo
+- Docker e Docker Compose
+
+## Estrutura do projeto
+
+```text
+.
+├── postgrad-mvp3-front/  # Aplicação Angular
+├── postgrad-mvp3-back/   # API Flask e banco SQLite
+├── docs/                 # Diagrama de arquitetura
+└── docker-compose.yml    # Execução integrada dos componentes
 ```
-(env)$ pip install -r requirements.txt
+
+## Pré-requisitos
+
+Para executar localmente sem Docker, instale:
+
+- Node.js 22 ou superior e npm
+- Python 3.11 ou superior
+
+Para executar em containers, instale Docker Desktop, que já inclui o Docker Compose.
+
+## Execução local
+
+### 1. Inicie a API
+
+```bash
+cd postgrad-mvp3-back
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+flask --app app run --host 0.0.0.0 --port 5000
 ```
 
-Este comando instala as dependências/bibliotecas, descritas no arquivo `requirements.txt`.
+A API estará disponível em `http://localhost:5000`. A documentação Swagger pode ser acessada em `http://localhost:5000/openapi`.
 
-Para executar a API  basta executar:
+### 2. Inicie o frontend
 
-```
-(env)$ flask run --host 0.0.0.0 --port 5000
-```
+Em outro terminal:
 
-Em modo de desenvolvimento é recomendado executar utilizando o parâmetro reload, que reiniciará o servidor
-automaticamente após uma mudança no código fonte. 
-
-```
-(env)$ flask run --host 0.0.0.0 --port 5000 --reload
+```bash
+cd postgrad-mvp3-front
+npm install
+npm start
 ```
 
-Abra o [http://localhost:5000/#/](http://localhost:5000/#/) no navegador para verificar o status da API em execução.
+Abra `http://localhost:4200` no navegador. O frontend espera a API em `http://127.0.0.1:5000`.
+
+## Execução com Docker
+
+Na raiz do projeto, execute:
+
+```bash
+docker compose up --build
+```
+
+Os serviços estarão disponíveis em:
+
+- Aplicação: `http://localhost:4200`
+- API: `http://localhost:5000`
+- Swagger: `http://localhost:5000/openapi`
+
+Os dados SQLite são mantidos no volume Docker `trak-club-data`. Para encerrar os containers, use `docker compose down`. Para remover também os dados persistidos, use `docker compose down -v`.
+
+## API
+
+A documentação interativa de todos os endpoints da API principal pode ser consultada pelo Swagger, em `http://localhost:5000/openapi`.
