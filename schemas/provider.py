@@ -10,7 +10,6 @@ class ProviderIdPath(BaseModel):
 
 
 class ProviderSchema(BaseModel):
-    """Defines how a new provider (club) should be represented"""
 
     name: str = "My Club"
     address: Optional[str] = "Street 123"
@@ -36,12 +35,7 @@ class ProviderSchema(BaseModel):
         return str(v)
 
 
-# class ProviderSearchSchema(BaseModel):
-#     name: str = "My Club"
-
-
 class ProviderViewSchema(BaseModel):
-    """Defines how a provider is returned"""
 
     id: int
     name: str
@@ -52,7 +46,6 @@ class ProviderViewSchema(BaseModel):
 
 
 class ProviderDetailViewSchema(BaseModel):
-    """Single provider with full fields (GET /provider/<id>)."""
 
     id: int
     name: str
@@ -68,7 +61,7 @@ class ProviderDetailViewSchema(BaseModel):
 
 
 class ProviderListSchema(RootModel[List[ProviderViewSchema]]):
-    """Top-level JSON array for GET /providers."""
+    pass
 
 
 class ProviderDeleteSchema(BaseModel):

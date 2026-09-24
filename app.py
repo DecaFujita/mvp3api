@@ -9,7 +9,6 @@ from model import Session, SessionLocal, Provider, Activity, ProviderActivity
 from logger import logger
 from schemas import *
 
-# API setup
 info = Info(
     title="TrakClub API",
     version="1.0.0",
@@ -19,8 +18,6 @@ app = OpenAPI(__name__, info=info)
 
 
 def _apply_cors_headers(response):
-    """CORS for browser clients. OPTIONS is handled in before_request because OpenAPI
-    routes often omit OPTIONS, which produced 405 preflights with no CORS headers."""
     origin = request.headers.get("Origin")
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin
@@ -54,25 +51,17 @@ def _cors_after(response):
     return _apply_cors_headers(response)
 
 
-# Tags
 home_tag = Tag(name="Docs", description="API Documentation")
 provider_tag = Tag(name="Provider", description="Manage clubs")
 activity_tag = Tag(name="Activity", description="Manage activities")
 session_tag = Tag(name="Session", description="Manage scheduled sessions")
 
 
-# -------------------------
-# HOME
-# -------------------------
 @app.get("/", tags=[home_tag], summary="Open API documentation (redirect)")
 def home():
-    """Redirects the root URL to the interactive OpenAPI / Swagger UI."""
     return redirect("/openapi")
 
 
-# -------------------------
-# PROVIDER
-# -------------------------
 @app.post(
     "/provider",
     tags=[provider_tag],
@@ -80,7 +69,6 @@ def home():
     responses={"200": ProviderViewSchema, "409": ErrorSchema, "400": ErrorSchema},
 )
 def add_provider(form: ProviderSchema):
-    """Register a new provider. Returns a summary view including id; activities start empty."""
     try:
         provider = Provider(
             name=form.name,
@@ -88,6 +76,7 @@ def add_provider(form: ProviderSchema):
             city=form.city,
             state=form.state,
             phone=form.phone,
+            email=form.email,
             instagram=form.instagram,
             description=form.description,
         )
@@ -112,7 +101,6 @@ def add_provider(form: ProviderSchema):
 def _activities_by_provider_ids(
     sa_session, provider_ids: List[int]
 ) -> Dict[int, List[Activity]]:
-    """Distinct Activity rows per provider from session rows and provider_activity."""
     if not provider_ids:
         return {}
     by_pid: Dict[int, dict] = defaultdict(lambda: {"order": [], "ids": set()})
@@ -149,7 +137,6 @@ def _activities_by_provider_ids(
     responses={"200": ProviderListSchema},
 )
 def get_providers():
-    """Returns every provider with basic fields and linked activities (from sessions and provider_activity)."""
     session = SessionLocal()
     providers = session.query(Provider).all()
     ids = [p.id for p in providers]
@@ -165,7 +152,6 @@ def get_providers():
     responses={"200": ProviderDetailViewSchema, "404": ErrorSchema},
 )
 def get_provider_by_id(path: ProviderIdPath):
-    """Returns contact fields, description, and activities for a single provider."""
     session = SessionLocal()
     provider = session.query(Provider).filter(Provider.id == path.provider_id).first()
 
@@ -179,6 +165,43 @@ def get_provider_by_id(path: ProviderIdPath):
     return present_provider_details(provider, activities), 200
 
 
+@app.put(
+    "/provider/<int:provider_id>",
+    tags=[provider_tag],
+    summary="Update a club (provider)",
+    responses={"200": ProviderDetailViewSchema, "404": ErrorSchema, "400": ErrorSchema},
+)
+def update_provider_by_id(path: ProviderIdPath, form: ProviderSchema):
+    db = SessionLocal()
+    provider = db.get(Provider, path.provider_id)
+    if not provider:
+        logger.warning("Provider not found")
+        return {"message": "Provider not found"}, 404
+
+    try:
+        provider.name = form.name
+        provider.address = form.address
+        provider.city = form.city
+        provider.state = form.state
+        provider.phone = form.phone
+        provider.email = form.email
+        provider.instagram = form.instagram
+        provider.description = form.description
+        db.commit()
+
+        activities = _activities_by_provider_ids(db, [provider.id]).get(provider.id, [])
+        logger.debug(f"Updated provider id={provider.id}")
+        return present_provider_details(provider, activities), 200
+    except IntegrityError:
+        db.rollback()
+        logger.warning("Provider update conflicts with an existing record")
+        return {"message": "Could not update provider"}, 400
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Error updating provider: {e}")
+        return {"message": "Could not update provider"}, 400
+
+
 @app.delete(
     "/provider/<int:provider_id>",
     tags=[provider_tag],
@@ -186,13 +209,18 @@ def get_provider_by_id(path: ProviderIdPath):
     responses={"200": ProviderDeleteSchema, "404": ErrorSchema, "409": ErrorSchema},
 )
 def delete_provider_by_id(path: ProviderIdPath):
-    """Removes a provider. Fails with 409 if sessions still reference this provider."""
     db = SessionLocal()
     provider = db.get(Provider, path.provider_id)
     if not provider:
         logger.warning("Provider not found")
         return {"message": "Provider not found"}, 404
     try:
+        db.query(Session).filter(Session.provider_id == path.provider_id).delete(
+            synchronize_session=False
+        )
+        db.query(ProviderActivity).filter(
+            ProviderActivity.provider_id == path.provider_id
+        ).delete(synchronize_session=False)
         db.delete(provider)
         db.commit()
     except IntegrityError:
@@ -205,9 +233,6 @@ def delete_provider_by_id(path: ProviderIdPath):
     return {"message": "Provider deleted", "id": path.provider_id}, 200
 
 
-# -------------------------
-# ACTIVITY
-# -------------------------
 @app.post(
     "/activity",
     tags=[activity_tag],
@@ -215,7 +240,6 @@ def delete_provider_by_id(path: ProviderIdPath):
     responses={"200": ActivityViewSchema, "409": ErrorSchema, "400": ErrorSchema},
 )
 def add_activity(form: ActivitySchema):
-    """Creates a global activity (e.g. Yoga). Name must be unique."""
     try:
         activity = Activity(name=form.name)
 
@@ -243,7 +267,6 @@ def add_activity(form: ActivitySchema):
     responses={"200": ActivityListSchema},
 )
 def get_activities():
-    """Returns all activities that can be linked to providers via sessions."""
     session = SessionLocal()
     activities = session.query(Activity).all()
 
@@ -257,7 +280,6 @@ def get_activities():
     responses={"200": ActivityViewSchema, "404": ErrorSchema},
 )
 def get_activity_by_id(path: ActivityIdPath):
-    """Returns id and name for a single activity."""
     session = SessionLocal()
     activity = session.query(Activity).filter(Activity.id == path.activity_id).first()
 
@@ -275,7 +297,6 @@ def get_activity_by_id(path: ActivityIdPath):
     responses={"200": ActivityDeleteSchema, "404": ErrorSchema, "409": ErrorSchema},
 )
 def delete_activity_by_id(path: ActivityIdPath):
-    """Deletes an activity. Fails with 409 if any session still uses it."""
     db = SessionLocal()
     activity = db.get(Activity, path.activity_id)
     if not activity:
@@ -294,9 +315,6 @@ def delete_activity_by_id(path: ActivityIdPath):
     return {"message": "Activity deleted", "id": path.activity_id}, 200
 
 
-# -------------------------
-# SESSION (scheduled offering)
-# -------------------------
 @app.post(
     "/session",
     tags=[session_tag],
@@ -304,7 +322,6 @@ def delete_activity_by_id(path: ActivityIdPath):
     responses={"200": SessionViewSchema, "400": ErrorSchema, "409": ErrorSchema},
 )
 def add_session(form: SessionSchema):
-    """Creates a scheduled offering: weekday, time, provider_id, activity_id. FKs must exist."""
     try:
         new_session = Session(
             weekday=form.weekday,
@@ -337,7 +354,6 @@ def add_session(form: SessionSchema):
     responses={"200": SessionListSchema},
 )
 def get_sessions():
-    """Returns every session row (weekday, time, provider_id, activity_id)."""
     db = SessionLocal()
     rows = db.query(Session).all()
 
@@ -351,7 +367,6 @@ def get_sessions():
     responses={"200": SessionViewSchema, "404": ErrorSchema},
 )
 def get_session_by_id(path: SessionIdPath):
-    """Returns a single session by primary key."""
     db = SessionLocal()
 
     row = db.query(Session).filter(Session.id == path.session_id).first()
@@ -363,6 +378,37 @@ def get_session_by_id(path: SessionIdPath):
     return present_session(row), 200
 
 
+@app.put(
+    "/session/<int:session_id>",
+    tags=[session_tag],
+    summary="Update a scheduled session",
+    responses={"200": SessionViewSchema, "404": ErrorSchema, "400": ErrorSchema, "409": ErrorSchema},
+)
+def update_session_by_id(path: SessionIdPath, form: SessionSchema):
+    db = SessionLocal()
+    row = db.get(Session, path.session_id)
+    if not row:
+        logger.warning("Session not found")
+        return {"message": "Session not found"}, 404
+
+    try:
+        row.weekday = form.weekday
+        row.time = form.time
+        row.provider_id = form.provider_id
+        row.activity_id = form.activity_id
+        db.commit()
+        logger.debug(f"Updated session id={row.id}")
+        return present_session(row), 200
+    except IntegrityError:
+        db.rollback()
+        logger.warning("Session update conflicts with an existing row")
+        return {"message": "Invalid provider_id or activity_id (or duplicate row)"}, 409
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Error updating session: {e}")
+        return {"message": "Could not update session"}, 400
+
+
 @app.delete(
     "/session/<int:session_id>",
     tags=[session_tag],
@@ -370,7 +416,6 @@ def get_session_by_id(path: SessionIdPath):
     responses={"200": SessionDeleteSchema, "404": ErrorSchema},
 )
 def delete_session_by_id(path: SessionIdPath):
-    """Removes one session row by id."""
     db = SessionLocal()
     row = db.get(Session, path.session_id)
     if not row:

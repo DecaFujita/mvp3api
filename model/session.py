@@ -7,10 +7,8 @@ class Session(Base):
 
     id = Column(Integer, primary_key=True)
 
-    # name = Column(String(140))  # optional
-
     weekday = Column(String(10), nullable=False)
-    time = Column(String(5), nullable=False)  # keep simple for MVP (e.g. "18:00")
+    time = Column(String(5), nullable=False)
 
     provider_id = Column(Integer, ForeignKey("provider.id"), nullable=False)
     activity_id = Column(Integer, ForeignKey("activity.id"), nullable=False)
@@ -22,4 +20,3 @@ class Session(Base):
         self.time = time
         self.provider_id = provider_id
         self.activity_id = activity_id
-        # self.name = name

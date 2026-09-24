@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 class Provider(Base):
     __tablename__ = "provider"
+    __table_args__ = {"sqlite_autoincrement": True}
 
     id = Column(Integer, primary_key=True)
     name = Column(String(140), nullable=False)

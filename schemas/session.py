@@ -13,7 +13,6 @@ class SessionSchema(BaseModel):
     activity_id: int = Field(..., description="ID of an existing activity")
     weekday: str = "Tue"
     time: str = "18:00"
-    # name: Optional[str] = "Yoga Evening"
 
     @field_validator("provider_id", "activity_id", mode="before")
     @classmethod
@@ -29,11 +28,10 @@ class SessionViewSchema(BaseModel):
     time: str
     provider_id: int
     activity_id: int
-    # name: Optional[str] = None
 
 
 class SessionListSchema(RootModel[List[SessionViewSchema]]):
-    """Top-level JSON array for GET /sessions."""
+    pass
 
 
 class SessionDeleteSchema(BaseModel):
@@ -51,7 +49,6 @@ def present_sessions(sessions: List[Session]):
                 "time": s.time,
                 "provider_id": s.provider_id,
                 "activity_id": s.activity_id,
-                # "name": s.name,
             }
         )
     return result
@@ -64,5 +61,4 @@ def present_session(s: Session):
         "time": s.time,
         "provider_id": s.provider_id,
         "activity_id": s.activity_id,
-        # "name": s.name,
     }

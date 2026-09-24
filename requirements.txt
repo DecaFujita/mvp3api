@@ -3,7 +3,7 @@ flask-openapi3
 Flask-SQLAlchemy
 nose2
 pydantic
-SQLAlchemy
+SQLAlchemy<2.1
 SQLAlchemy-Utils
 typing_extensions
 werkzeug
